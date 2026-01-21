@@ -3,9 +3,7 @@ import struct
 
 import rclpy
 from rclpy.node import Node
-
-from std_msgs.msg import ImuPressure
-
+from std_msgs.msg import String
 
 CAN_IFACE = "can0"
 
@@ -31,17 +29,19 @@ def i32_le(b0, b1, b2, b3):
     return v - 0x100000000 if v & 0x80000000 else v
 
 
-class CanPublisher(Node):
+class CanStringPublisher(Node):
 
     def __init__(self):
-        super().__init__("can_publisher")
+        super().__init__("can_string_publisher")
 
+        # Publisher using std_msgs/String
         self.publisher = self.create_publisher(
-            ImuPressure,
+            String,
             "can/imu_pressure",
             10
         )
 
+        # SocketCAN setup
         self.sock = socket.socket(
             socket.AF_CAN,
             socket.SOCK_RAW,
@@ -49,12 +49,17 @@ class CanPublisher(Node):
         )
         self.sock.bind((CAN_IFACE,))
 
-        self.latest = ImuPressure()
+        self.latest = {
+            "roll": None, "pitch": None, "yaw": None,
+            "pressure": None, "depth": None,
+            "ctr_roll": None, "ctr_pitch": None, "ctr_yaw": None,
+            "ctr_pressure": None, "ctr_depth": None,
+        }
 
-        # non-blocking read loop at ~1 kHz
+        # read CAN ~1kHz
         self.timer = self.create_timer(0.001, self.read_can)
 
-        self.get_logger().info("CAN publisher started")
+        self.get_logger().info("CAN String publisher started")
 
     def read_can(self):
         try:
@@ -72,34 +77,43 @@ class CanPublisher(Node):
         b = list(data)
 
         if can_id == CAN_ID_ROLL:
-            self.latest.roll = i32_le(*b[:4]) / SCALE_RPY
-            self.latest.ctr_roll = u16_le(b[4], b[5])
+            self.latest["roll"] = i32_le(*b[:4]) / SCALE_RPY
+            self.latest["ctr_roll"] = u16_le(b[4], b[5])
 
         elif can_id == CAN_ID_PITCH:
-            self.latest.pitch = i32_le(*b[:4]) / SCALE_RPY
-            self.latest.ctr_pitch = u16_le(b[4], b[5])
+            self.latest["pitch"] = i32_le(*b[:4]) / SCALE_RPY
+            self.latest["ctr_pitch"] = u16_le(b[4], b[5])
 
         elif can_id == CAN_ID_YAW:
-            self.latest.yaw = i32_le(*b[:4]) / SCALE_RPY
-            self.latest.ctr_yaw = u16_le(b[4], b[5])
+            self.latest["yaw"] = i32_le(*b[:4]) / SCALE_RPY
+            self.latest["ctr_yaw"] = u16_le(b[4], b[5])
 
         elif can_id == CAN_ID_PRESSURE:
-            self.latest.pressure = u16_le(b[0], b[1]) / SCALE_PD
-            self.latest.ctr_pressure = u16_le(b[2], b[3])
+            self.latest["pressure"] = u16_le(b[0], b[1]) / SCALE_PD
+            self.latest["ctr_pressure"] = u16_le(b[2], b[3])
 
         elif can_id == CAN_ID_DEPTH:
-            self.latest.depth = i16_le(b[0], b[1]) / SCALE_PD
-            self.latest.ctr_depth = u16_le(b[2], b[3])
+            self.latest["depth"] = i16_le(b[0], b[1]) / SCALE_PD
+            self.latest["ctr_depth"] = u16_le(b[2], b[3])
 
         else:
             return
 
-        self.publisher.publish(self.latest)
+        # publish as a single string
+        msg = String()
+        msg.data = (
+            f"roll={self.latest['roll']}, ctr_roll={self.latest['ctr_roll']}, "
+            f"pitch={self.latest['pitch']}, ctr_pitch={self.latest['ctr_pitch']}, "
+            f"yaw={self.latest['yaw']}, ctr_yaw={self.latest['ctr_yaw']}, "
+            f"pressure={self.latest['pressure']}, ctr_pressure={self.latest['ctr_pressure']}, "
+            f"depth={self.latest['depth']}, ctr_depth={self.latest['ctr_depth']}"
+        )
+        self.publisher.publish(msg)
 
 
 def main():
     rclpy.init()
-    node = CanPublisher()
+    node = CanStringPublisher()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
