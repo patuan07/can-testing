@@ -102,13 +102,12 @@ class CanStringPublisher(Node):
         # publish as a single string
         msg = String()
         msg.data = (
-            f"roll={self.latest['roll']}, ctr_roll={self.latest['ctr_roll']}, "
-            f"pitch={self.latest['pitch']}, ctr_pitch={self.latest['ctr_pitch']}, "
-            f"yaw={self.latest['yaw']}, ctr_yaw={self.latest['ctr_yaw']}, "
-            f"pressure={self.latest['pressure']}, ctr_pressure={self.latest['ctr_pressure']}, "
-            f"depth={self.latest['depth']}, ctr_depth={self.latest['ctr_depth']}"
+            f"roll={self.latest['roll']:.4f}, ctr_roll={self.latest['ctr_roll']}, "
+            f"pitch={self.latest['pitch']:.4f}, ctr_pitch={self.latest['ctr_pitch']}, "
+            f"yaw={self.latest['yaw']:.4f}, ctr_yaw={self.latest['ctr_yaw']}, "
+            f"pressure={self.latest['pressure']:.2f}, ctr_pressure={self.latest['ctr_pressure']}, "
+            f"depth={self.latest['depth']:.2f}, ctr_depth={self.latest['ctr_depth']}"
         )
-        self.publisher.publish(msg)
 
 
 def main():
